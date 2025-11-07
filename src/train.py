@@ -269,6 +269,8 @@ def main(cfg):
     if not run_cfg_path.exists():
         raise FileNotFoundError(run_cfg_path)
     run_cfg = OmegaConf.load(run_cfg_path)
+    # Set struct=False to allow merging new keys from run_cfg
+    OmegaConf.set_struct(cfg, False)
     cfg = OmegaConf.merge(cfg, run_cfg)
 
     # Mode handling -----------------------------------------------------------
