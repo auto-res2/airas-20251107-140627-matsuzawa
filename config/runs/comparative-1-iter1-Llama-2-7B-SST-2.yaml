@@ -1,7 +1,7 @@
 run_id: comparative-1-iter1-Llama-2-7B-SST-2
 method: EChorda
 model:
-  name: Llama-2-7B
+  name: NousResearch/Llama-2-7b-hf
   precision: bfloat16
   architecture_notes: "Decoder-only 32-layer transformer; depth/head/rank hard-concrete gates"
   gating:

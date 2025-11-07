@@ -1,7 +1,7 @@
 run_id: proposed-iter1-Llama-2-7B-SST-2
 method: MetaS-PEFT
 model:
-  name: Llama-2-7B
+  name: NousResearch/Llama-2-7b-hf
   precision: bfloat16
   architecture_notes: "Decoder-only 32-layer transformer; tri-granular gating (layer, head, LoRA rank)"
   peft:
