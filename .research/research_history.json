@@ -717,7 +717,52 @@
     "iterations": [
       {
         "iteration_id": 1,
-        "method": "MetaSurrogate-PEFT (MetaS-PEFT)\nA. Universal differentiable hardware surrogate\n   1. Represent a forward pass by the vector s=(seq_len, kept_layers, kept_heads, kept_ranks, param_bits).\n   2. Off-line, collect <3 k measurements of (energy, latency, max_power) on a pool of 6 devices (RTX-A6000, Jetson-Orin-NX, Mac-M2, iPhone-15-NPU, Pixel-8-TPU, Raspberry-Pi-4).\n   3. Train a 3-headed MLP  ψ_φ(s, h_id)→(Ē, L̂ , P̂) where h_id is a one-hot hardware tag. Mixup on h_id regularises cross-device features.\n   4. Meta-learn φ with leave-one-device-out objective so that the surrogate works zero-shot on unseen hardware when given 5 calibration samples.\nB. Multi-objective tri-granular gating\n   1. Keep EChorda’s depth/head/rank hard-concrete gates g_θ.\n   2. New budget loss:  L_total=L_task +λ Ē+μ L̂ +ν P̂  with user-specified weights (λ,μ,ν).\n   3. Gradients flow through ψ_φ ; no device calls during training.\nC. Few-shot calibration for new hardware\n   • At deployment, run 5 random gating configs, fit a linear correction α,β so that  ψ′(s)=α⊙ψ_φ(s)+β ; no further fine-tuning of θ.\nD. Pareto controller distillation\n   • After training, fit a small DecisionTree to predict a Pareto-optimal (Ē ,L̂ ,P̂) triple from token entropy and position, removing the MLP at inference (≤1 kB)."
+        "method": "MetaSurrogate-PEFT (MetaS-PEFT)\nA. Universal differentiable hardware surrogate\n   1. Represent a forward pass by the vector s=(seq_len, kept_layers, kept_heads, kept_ranks, param_bits).\n   2. Off-line, collect <3 k measurements of (energy, latency, max_power) on a pool of 6 devices (RTX-A6000, Jetson-Orin-NX, Mac-M2, iPhone-15-NPU, Pixel-8-TPU, Raspberry-Pi-4).\n   3. Train a 3-headed MLP  ψ_φ(s, h_id)→(Ē, L̂ , P̂) where h_id is a one-hot hardware tag. Mixup on h_id regularises cross-device features.\n   4. Meta-learn φ with leave-one-device-out objective so that the surrogate works zero-shot on unseen hardware when given 5 calibration samples.\nB. Multi-objective tri-granular gating\n   1. Keep EChorda’s depth/head/rank hard-concrete gates g_θ.\n   2. New budget loss:  L_total=L_task +λ Ē+μ L̂ +ν P̂  with user-specified weights (λ,μ,ν).\n   3. Gradients flow through ψ_φ ; no device calls during training.\nC. Few-shot calibration for new hardware\n   • At deployment, run 5 random gating configs, fit a linear correction α,β so that  ψ′(s)=α⊙ψ_φ(s)+β ; no further fine-tuning of θ.\nD. Pareto controller distillation\n   • After training, fit a small DecisionTree to predict a Pareto-optimal (Ē ,L̂ ,P̂) triple from token entropy and position, removing the MLP at inference (≤1 kB).",
+        "experimental_design": {
+          "experiment_summary": "The study validates MetaSurrogate-PEFT (MetaS-PEFT), a PEFT framework that jointly minimises energy, latency and peak-power without expensive per-device profiling. 1) We fine-tune a Llama-2-7B backbone on SST-2 with tri-granular hard-concrete gates over layers, heads and LoRA ranks. 2) During optimisation, a differentiable meta-surrogate ψϕ predicts (Ē, L̂, P̂) from simple model statistics s and a hardware ID; gradients from the composite loss Ltask+λĒ+μL̂+νP̂ flow back to the gates—no real measurements are taken. 3) ψϕ is meta-trained offline on <3 k profiles gathered from four GPUs/NPUs using a leave-one-device-out objective; at deployment on the unseen Google Pixel-8 Edge-TPU we collect only 5 random profiles to fit a linear calibration (α,β). 4) After convergence we distil the gating policy into a 1-kB decision tree for negligible runtime overhead. 5) Evaluation compares MetaS-PEFT against EChorda on the same Pixel-8 budget (≤6 J, ≤80 ms, ≤11 W) and reports 4-D hyper-volume, surrogate MAE and the number of on-device measurements. All training and search run on a single NVIDIA A100 80 GB with 2 TB RAM, easily fitting the surrogate, calibration data and full-precision Llama-2-7B checkpoints.",
+          "evaluation_metrics": [
+            "4-D Hyper-Volume (Accuracy, -Energy, -Latency, -Power)",
+            "Accuracy",
+            "Energy (J)",
+            "Latency (ms)",
+            "Peak Power (W)",
+            "Surrogate MAE",
+            "Number of On-Device Measurements",
+            "4-D hyper-volume (HV) of accuracy vs (energy, latency, power) on the unseen Pixel-8."
+          ],
+          "proposed_method": "MetaSurrogate-PEFT (MetaS-PEFT) combines a meta-learned, device-conditioned surrogate with multi-objective gating.\nA) Universal differentiable surrogate: Represent each forward pass by statistics s=(seq_len, kept_layers, kept_heads, kept_ranks, param_bits). Train a 3-headed MLP ψϕ(s,h_id)→(Ē, L̂, P̂) on <3 k measured tuples from four reference devices. Mixup on the one-hot hardware tag h_id enforces shared structure. Meta-learning with a leave-one-device-out loss lets the surrogate adapt to unseen hardware with only 5 calibration samples.\nB) Multi-objective tri-granular gating: Re-use EChorda’s hard-concrete gates gθ over layers, heads and LoRA ranks. Optimise θ with the loss Ltotal = Ltask + λĒ + μL̂ + νP̂, where (Ē, L̂, P̂)=ψϕ(s,h_id). Gradients propagate through ψϕ, keeping the entire process differentiable and measurement-free.\nC) Few-shot calibration: On a new device, measure energy/latency/power for 5 random gate settings, solve a 3×3 least-squares system to obtain per-metric scale/shift (α,β) and form ψ′(s)=α⊙ψϕ(s)+β.\nD) Pareto controller distillation: After training, sample 2 k random inputs, record token entropy/position and the chosen gate states, and train a depth-3 decision tree that predicts the closest Pareto-optimal triple. This removes the MLP at inference, shrinking the controller to ≤1 kB.\nThe result is a PEFT model whose accuracy–energy–latency–power trade-off transfers across devices with negligible extra profiling.",
+          "comparative_methods": [
+            "EChorda"
+          ],
+          "models_to_use": [
+            "Llama-2-7B"
+          ],
+          "datasets_to_use": [
+            "SST-2"
+          ],
+          "hyperparameters_to_search": {
+            "learning_rate": "1e-5-5e-4",
+            "lambda_energy (λ)": "0.1-5.0",
+            "mu_latency (μ)": "0.1-5.0",
+            "nu_power (ν)": "0.1-5.0",
+            "hard_concrete_temperature": "0.5-5.0",
+            "gate_sparsity_regulariser": "1e-6-1e-3"
+          }
+        },
+        "experiment_runs": [
+          {
+            "run_id": "proposed-iter1-Llama-2-7B-SST-2",
+            "method_name": "proposed",
+            "model_name": "Llama-2-7B",
+            "dataset_name": "SST-2"
+          },
+          {
+            "run_id": "comparative-1-iter1-Llama-2-7B-SST-2",
+            "method_name": "comparative-1",
+            "model_name": "Llama-2-7B",
+            "dataset_name": "SST-2"
+          }
+        ]
       }
     ]
   }
