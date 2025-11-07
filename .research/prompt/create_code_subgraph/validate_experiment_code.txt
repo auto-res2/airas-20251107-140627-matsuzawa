@@ -1,0 +1,356 @@
+
+LLM Name: o3-2025-04-16
+Input:
+You are an AI code reviewer validating production-ready experiment code for research papers.
+
+Analyze the provided experiment code and determine if it meets all requirements for immediate execution in research experiments.
+
+# Instructions
+
+## Core Validation Criteria
+Check if the generated experiment code meets ALL of the following requirements:
+
+1. **Complete Implementation**:
+   - Every component is fully functional, production-ready, publication-worthy code
+   - No "omitted for brevity", no "simplified version", no TODO, PLACEHOLDER, pass, or ...
+   - All functions and classes are completely implemented
+   - No truncated code sections or incomplete implementations
+
+2. **Hydra Integration**:
+   - Uses Hydra to manage all experiment configurations from `config/runs/*.yaml` files
+   - All parameters are loaded from run configs dynamically
+   - Proper configuration structure with run_id, method, model, dataset, training, and optuna sections
+   - CLI interface matches:
+     * Training (full): `uv run python -u -m src.main run={run_id} results_dir={path} mode=full`
+     * Training (trial): `uv run python -u -m src.main run={run_id} results_dir={path} mode=trial`
+     * Evaluation: `uv run python -m src.evaluate results_dir={path} run_ids='["run-1", "run-2", ...]'` (independent execution)
+   - Code must automatically configure based on mode:
+     * When `cfg.mode == "trial"`: Set `cfg.wandb.mode = "disabled"`, `cfg.optuna.n_trials = 0`, epochs=1
+     * When `cfg.mode == "full"`: Set `cfg.wandb.mode = "online"` and use full configuration
+
+3. **Complete Data Pipeline**:
+   - Full data loading and preprocessing implementation
+   - Dataset-specific preprocessing is properly implemented
+   - No placeholder dataset loading code
+   - Proper error handling for data operations
+   - Uses `.cache/` as the cache directory for all datasets and models
+
+4. **Model Implementation**:
+   - Complete model architectures for all methods (proposed and comparative methods)
+   - No placeholders (TODO, PLACEHOLDER, pass, or incomplete implementations)
+   - When External Resources specify HuggingFace models: properly use and customize them (acceptable to wrap AutoModel, add adapters, etc.)
+   - When no external models specified: implement architectures from scratch using PyTorch primitives
+   - Model-specific configurations correctly applied
+   - Proper PyTorch usage throughout
+
+5. **File Structure Compliance**:
+   - Contains EXACTLY these required files (and NO other files):
+     * `src/train.py`
+     * `src/evaluate.py`
+     * `src/preprocess.py`
+     * `src/model.py`
+     * `src/main.py`
+     * `pyproject.toml`
+     * `config/config.yaml`
+   - NO additional files (e.g., NO `src/__init__.py`, NO `setup.py`, NO other Python files)
+   - No missing files from the structure
+   - All functionality contained within specified files
+
+6. **WandB Integration**:
+   - train.py initializes WandB and logs ALL metrics comprehensively:
+     * Use `wandb.log()` at each training step/batch/epoch with ALL relevant time-series metrics
+     * Log as frequently as possible (per-batch or per-epoch) to capture complete training dynamics
+     * Use `wandb.summary["key"] = value` to save final/best metrics (best_val_acc, final_test_acc, best_epoch, etc.)
+     * Metric names in train.py's wandb.log() MUST exactly match the keys used in evaluate.py's run.history()
+   - Optuna Integration: If using Optuna, DO NOT log intermediate trial results to WandB - only log the final run with best hyperparameters
+   - Code must automatically configure based on mode:
+     * When `cfg.mode == "trial"`: Set `cfg.wandb.mode = "disabled"` before any WandB operations
+     * When `cfg.mode == "full"`: Set `cfg.wandb.mode = "online"` before any WandB operations
+   - NO results.json or stdout JSON dumps in train.py
+   - config/config.yaml contains mandatory WandB settings (entity/project)
+   - `WANDB_API_KEY` environment variable is available for authentication
+
+7. **Configuration Files**:
+   - The generated code properly references config files via Hydra
+   - NOTE: config/runs/{run_id}.yaml files are provided separately (not in ExperimentCode)
+   - All run configurations match the experiment_runs provided
+   - Optuna search spaces are properly defined if applicable
+
+8. **Evaluation Script Independence**:
+   - evaluate.py is executed independently via `uv run python -m src.evaluate results_dir={path} run_ids='["run-1", "run-2"]'`
+   - Accepts `run_ids` parameter as JSON string list (parse with `json.loads(args.run_ids)`)
+   - main.py DOES NOT call evaluate.py
+   - evaluate.py loads WandB config from `config/config.yaml` (in repository root)
+   - evaluate.py retrieves comprehensive data from WandB API:
+     * Use `wandb.Api()` to get run data: `run = api.run(f"{entity}/{project}/{run_id}")`
+     * Retrieve: `history = run.history()`, `summary = run.summary._json_dict`, `config = dict(run.config)`
+   - **STEP 1: Per-Run Processing** (for each run_id):
+     * Export comprehensive run-specific metrics to: `{results_dir}/{run_id}/metrics.json`
+     * Generate run-specific figures (learning curves, confusion matrices) to: `{results_dir}/{run_id}/`
+     * Each run should have its own subdirectory with its metrics and figures
+   - **STEP 2: Aggregated Analysis** (after processing all runs):
+     * Export aggregated metrics to: `{results_dir}/comparison/aggregated_metrics.json` with the following structure:
+       ```json
+       {
+         "primary_metric": "4-D hyper-volume (HV) of accuracy vs (energy, latency, power) on the unseen Pixel-8.",
+         "metrics": {
+           "metric_name_1": {"run_id_1": value1, "run_id_2": value2, ...},
+           "metric_name_2": {"run_id_1": value1, "run_id_2": value2, ...}
+         },
+         "best_proposed": {
+           "run_id": "proposed-iter2-model-dataset",
+           "value": 0.92
+         },
+         "best_baseline": {
+           "run_id": "comparative-1-model-dataset",
+           "value": 0.88
+         },
+         "gap": 4.55
+       }
+       ```
+       The structure must include:
+       - "primary_metric": The primary evaluation metric name from the hypothesis
+       - "metrics": All collected metrics organized by metric name, then by run_id
+       - "best_proposed": The run_id and value of the proposed method with the best primary_metric performance (run_id contains "proposed")
+       - "best_baseline": The run_id and value of the baseline/comparative method with the best primary_metric performance (run_id contains "comparative" or "baseline")
+       - "gap": Performance gap calculated as: (best_proposed.value - best_baseline.value) / best_baseline.value * 100
+         * Must use the expected results from the hypothesis to determine metric direction (higher vs lower is better)
+         * If the metric should be minimized, reverse the sign of the gap
+         * The gap represents the percentage improvement of the proposed method over the best baseline
+     * Generate comparison figures to: `{results_dir}/comparison/`
+     * Cross-run comparison charts (bar charts, box plots)
+     * Performance metrics tables
+     * Statistical significance tests
+   - Proper figure quality: legends, annotations, tight_layout
+   - Follows GLOBALLY UNIQUE naming convention to prevent collisions:
+     * Per-run figures: `{run_id}_{figure_topic}[_<condition>][_pairN].pdf` (e.g., `run-1-proposed-bert-glue_learning_curve.pdf`)
+     * Comparison figures: `comparison_{figure_topic}[_<condition>][_pairN].pdf` (e.g., `comparison_accuracy_bar_chart.pdf`)
+   - train.py and main.py generate NO figures
+   - evaluate.py cannot run in trial_mode (no WandB data available when WandB disabled)
+
+9. **Mode-Based Implementation**:
+   - `mode` parameter controls experiment behavior (required parameter)
+   - When `cfg.mode == "trial"`:
+     * Properly reduces computational load: epochs=1, batches limited to 1-2, Optuna disabled (n_trials=0), small evaluation subset
+     * Automatically sets `cfg.wandb.mode = "disabled"`
+     * Purpose: Fast validation that code runs without errors
+   - When `cfg.mode == "full"`:
+     * Automatically sets `cfg.wandb.mode = "online"`
+     * Uses full configuration (full epochs, full Optuna trials, etc.)
+
+## Output Format
+Respond with a JSON object containing:
+- `is_code_ready`: boolean - true if ALL criteria are met, false otherwise
+- `code_issue`: string - specific issues found if any criteria are not met, focusing on what needs to be fixed
+
+# Hypothesis
+open_problems='1. Building a differentiable cost term by naively sampling the target device (as in EChorda) still needs thousands of real on-device measurements and must be re-done for every new phone/GPU. 2. Existing PEFT work optimises one proxy (MACs) or one real metric (energy) at a time – practitioners actually care about several, often conflicting, hardware objectives (latency, peak-power, energy). 3. Current gating methods have no mechanism for transferring a learned energy/latency trade-off from one device to another without extra measurements. 4. There is no public surrogate that predicts all three metrics jointly from simple model statistics, nor a benchmark that tests cross-device generalisation.' method='MetaSurrogate-PEFT (MetaS-PEFT)\nA. Universal differentiable hardware surrogate\n   1. Represent a forward pass by the vector s=(seq_len, kept_layers, kept_heads, kept_ranks, param_bits).\n   2. Off-line, collect <3 k measurements of (energy, latency, max_power) on a pool of 6 devices (RTX-A6000, Jetson-Orin-NX, Mac-M2, iPhone-15-NPU, Pixel-8-TPU, Raspberry-Pi-4).\n   3. Train a 3-headed MLP  ψ_φ(s, h_id)→(Ē, L̂ , P̂) where h_id is a one-hot hardware tag. Mixup on h_id regularises cross-device features.\n   4. Meta-learn φ with leave-one-device-out objective so that the surrogate works zero-shot on unseen hardware when given 5 calibration samples.\nB. Multi-objective tri-granular gating\n   1. Keep EChorda’s depth/head/rank hard-concrete gates g_θ.\n   2. New budget loss:  L_total=L_task +λ\u2006Ē+μ\u2006L̂ +ν\u2006P̂  with user-specified weights (λ,μ,ν).\n   3. Gradients flow through ψ_φ ; no device calls during training.\nC. Few-shot calibration for new hardware\n   • At deployment, run 5 random gating configs, fit a linear correction α,β so that  ψ′(s)=α⊙ψ_φ(s)+β ; no further fine-tuning of θ.\nD. Pareto controller distillation\n   • After training, fit a small DecisionTree to predict a Pareto-optimal (Ē ,L̂ ,P̂) triple from token entropy and position, removing the MLP at inference (≤1 kB).' experimental_setup='Models: RoBERTa-base and Llama-2-7B.\nDatasets: SST-2, CoLA, Natural-Instructions.\nTraining devices (surrogate pool): RTX-A6000, Jetson-Orin-NX, MacBook-M2, iPhone-15.\nUnseen test device: Google Pixel-8 Edge-TPU (20 W cap).\nBudgets: energy≤6 J, latency≤80 ms, power≤11 W.\nBaselines: (i) Original EChorda retrained on Pixel-8, (ii) DiGASE (depth+rank), (iii) Static LoRA.\nMetrics: Hyper-volume of (Accuracy,-Ē,-L̂ ,-P̂) on Pixel-8; MAE of surrogate on unseen device; #real measurements required.' primary_metric='4-D hyper-volume (HV) of accuracy vs (energy, latency, power) on the unseen Pixel-8.' experimental_code='# meta-surrogate (device-agnostic)\nclass MetaSurrogate(torch.nn.Module):\n    def __init__(self, n_hw, d_stat=5):\n        super().__init__()\n        self.hw_embed=torch.nn.Embedding(n_hw,8)\n        self.net=torch.nn.Sequential(\n            torch.nn.Linear(d_stat+8,64),torch.nn.ReLU(),\n            torch.nn.Linear(64,64),torch.nn.ReLU(),\n            torch.nn.Linear(64,3))            # E, L, P\n    def forward(self,stats, hw_id):\n        h=self.hw_embed(hw_id)\n        x=torch.cat([stats,h],-1)\n        return self.net(x)\n# calibration\nwith torch.no_grad():\n    α,β=torch.linalg.lstsq(preds, meas).solution   # 5×3 least squares' expected_result='1. Zero-shot on Pixel-8 with only 5 calibration runs MetaS-PEFT reaches 95.0 % SST-2 accuracy at 5.9 J / 74 ms / 10.4 W, beating EChorda-retrained (94.6 %, 6.3 J / 78 ms / 11.2 W) while using 2 × fewer on-device measurements (5 vs 200). 2. Surrogate MAE on unseen hardware: energy 2.4 %, latency 3.1 %, power 4.0 %. 3. Pareto tree adds <40 µs overhead and retains ≥99 % hyper-volume.' expected_conclusion='A meta-learned, device-conditioned surrogate lets PEFT methods optimise *multiple* real hardware objectives without costly per-device sampling. The approach generalises across heterogeneous accelerators with negligible calibration and sets a new accuracy-/-energy-/-latency frontier for on-device NLP, pushing PEFT towards practical, sustainable deployment.'
+
+# Current Research Method
+MetaSurrogate-PEFT (MetaS-PEFT)
+A. Universal differentiable hardware surrogate
+   1. Represent a forward pass by the vector s=(seq_len, kept_layers, kept_heads, kept_ranks, param_bits).
+   2. Off-line, collect <3 k measurements of (energy, latency, max_power) on a pool of 6 devices (RTX-A6000, Jetson-Orin-NX, Mac-M2, iPhone-15-NPU, Pixel-8-TPU, Raspberry-Pi-4).
+   3. Train a 3-headed MLP  ψ_φ(s, h_id)→(Ē, L̂ , P̂) where h_id is a one-hot hardware tag. Mixup on h_id regularises cross-device features.
+   4. Meta-learn φ with leave-one-device-out objective so that the surrogate works zero-shot on unseen hardware when given 5 calibration samples.
+B. Multi-objective tri-granular gating
+   1. Keep EChorda’s depth/head/rank hard-concrete gates g_θ.
+   2. New budget loss:  L_total=L_task +λ Ē+μ L̂ +ν P̂  with user-specified weights (λ,μ,ν).
+   3. Gradients flow through ψ_φ ; no device calls during training.
+C. Few-shot calibration for new hardware
+   • At deployment, run 5 random gating configs, fit a linear correction α,β so that  ψ′(s)=α⊙ψ_φ(s)+β ; no further fine-tuning of θ.
+D. Pareto controller distillation
+   • After training, fit a small DecisionTree to predict a Pareto-optimal (Ē ,L̂ ,P̂) triple from token entropy and position, removing the MLP at inference (≤1 kB).
+
+# Experimental Design
+- Strategy: The study validates MetaSurrogate-PEFT (MetaS-PEFT), a PEFT framework that jointly minimises energy, latency and peak-power without expensive per-device profiling. 1) We fine-tune a Llama-2-7B backbone on SST-2 with tri-granular hard-concrete gates over layers, heads and LoRA ranks. 2) During optimisation, a differentiable meta-surrogate ψϕ predicts (Ē, L̂, P̂) from simple model statistics s and a hardware ID; gradients from the composite loss Ltask+λĒ+μL̂+νP̂ flow back to the gates—no real measurements are taken. 3) ψϕ is meta-trained offline on <3 k profiles gathered from four GPUs/NPUs using a leave-one-device-out objective; at deployment on the unseen Google Pixel-8 Edge-TPU we collect only 5 random profiles to fit a linear calibration (α,β). 4) After convergence we distil the gating policy into a 1-kB decision tree for negligible runtime overhead. 5) Evaluation compares MetaS-PEFT against EChorda on the same Pixel-8 budget (≤6 J, ≤80 ms, ≤11 W) and reports 4-D hyper-volume, surrogate MAE and the number of on-device measurements. All training and search run on a single NVIDIA A100 80 GB with 2 TB RAM, easily fitting the surrogate, calibration data and full-precision Llama-2-7B checkpoints.
+- Proposed Method: MetaSurrogate-PEFT (MetaS-PEFT) combines a meta-learned, device-conditioned surrogate with multi-objective gating.
+A) Universal differentiable surrogate: Represent each forward pass by statistics s=(seq_len, kept_layers, kept_heads, kept_ranks, param_bits). Train a 3-headed MLP ψϕ(s,h_id)→(Ē, L̂, P̂) on <3 k measured tuples from four reference devices. Mixup on the one-hot hardware tag h_id enforces shared structure. Meta-learning with a leave-one-device-out loss lets the surrogate adapt to unseen hardware with only 5 calibration samples.
+B) Multi-objective tri-granular gating: Re-use EChorda’s hard-concrete gates gθ over layers, heads and LoRA ranks. Optimise θ with the loss Ltotal = Ltask + λĒ + μL̂ + νP̂, where (Ē, L̂, P̂)=ψϕ(s,h_id). Gradients propagate through ψϕ, keeping the entire process differentiable and measurement-free.
+C) Few-shot calibration: On a new device, measure energy/latency/power for 5 random gate settings, solve a 3×3 least-squares system to obtain per-metric scale/shift (α,β) and form ψ′(s)=α⊙ψϕ(s)+β.
+D) Pareto controller distillation: After training, sample 2 k random inputs, record token entropy/position and the chosen gate states, and train a depth-3 decision tree that predicts the closest Pareto-optimal triple. This removes the MLP at inference, shrinking the controller to ≤1 kB.
+The result is a PEFT model whose accuracy–energy–latency–power trade-off transfers across devices with negligible extra profiling.
+- Evaluation Metrics: ['4-D Hyper-Volume (Accuracy, -Energy, -Latency, -Power)', 'Accuracy', 'Energy (J)', 'Latency (ms)', 'Peak Power (W)', 'Surrogate MAE', 'Number of On-Device Measurements', '4-D hyper-volume (HV) of accuracy vs (energy, latency, power) on the unseen Pixel-8.']
+
+# Experiment Runs
+
+- Run ID: proposed-iter1-Llama-2-7B-SST-2
+  Method: proposed
+  Model: Llama-2-7B
+  Dataset: SST-2
+  
+  Config Content:
+  ```yaml
+  run_id: proposed-iter1-Llama-2-7B-SST-2
+method: MetaS-PEFT
+model:
+  name: Llama-2-7B
+  precision: bfloat16
+  architecture_notes: "Decoder-only 32-layer transformer; tri-granular gating (layer, head, LoRA rank)"
+  peft:
+    method: LoRA
+    target_modules: ["q_proj", "v_proj"]
+    r: 8          # default, tuned by Optuna
+    alpha: 16
+    dropout: 0.1
+  gating:
+    granularity: [layer, head, rank]
+    hard_concrete_temperature: 2.0
+    gate_sparsity_regulariser: 1e-5
+dataset:
+  name: sst2
+  source: "huggingface:stanfordnlp/sst2"
+  max_length: 128
+  padding: max_length
+  batch_size: 16
+training:
+  num_epochs: 3
+  learning_rate: 2e-5
+  optimizer: adamw
+  weight_decay: 0.01
+  gradient_accumulation_steps: 8
+  lr_scheduler: cosine
+  warmup_ratio: 0.05
+  seed: 42
+budgets:
+  energy_j: 6.0
+  latency_ms: 80.0
+  power_w: 11.0
+surrogate:
+  checkpoint_path: "checkpoints/meta_surrogate_v1.pt"
+  n_hardware_tags: 6
+  meta_training_devices: ["RTX-A6000", "Jetson-Orin-NX", "MacBook-M2", "iPhone-15-NPU", "Pixel-8-TPU", "Raspberry-Pi-4"]
+  calibration_samples: 5
+  calibration_method: linear_scale_shift
+objective_weights:
+  lambda_energy: 1.0
+  mu_latency: 1.0
+  nu_power: 1.0
+evaluation:
+  primary_metric: 4-D_hyper_volume
+  metrics: [accuracy, energy_j, latency_ms, power_w, surrogate_mae, hv]
+optuna:
+  n_trials: 60
+  direction: maximize
+  search_space:
+    learning_rate:
+      type: loguniform
+      low: 1e-5
+      high: 5e-4
+    lambda_energy:
+      type: loguniform
+      low: 0.1
+      high: 5.0
+    mu_latency:
+      type: loguniform
+      low: 0.1
+      high: 5.0
+    nu_power:
+      type: loguniform
+      low: 0.1
+      high: 5.0
+    hard_concrete_temperature:
+      type: uniform
+      low: 0.5
+      high: 5.0
+    gate_sparsity_regulariser:
+      type: loguniform
+      low: 1e-6
+      high: 1e-3
+    r:
+      type: int
+      low: 4
+      high: 32
+    batch_size:
+      type: categorical
+      choices: [8, 16, 32]
+
+  ```
+  
+
+- Run ID: comparative-1-iter1-Llama-2-7B-SST-2
+  Method: comparative-1
+  Model: Llama-2-7B
+  Dataset: SST-2
+  
+  Config Content:
+  ```yaml
+  run_id: comparative-1-iter1-Llama-2-7B-SST-2
+method: EChorda
+model:
+  name: Llama-2-7B
+  precision: bfloat16
+  architecture_notes: "Decoder-only 32-layer transformer; depth/head/rank hard-concrete gates"
+  gating:
+    granularity: [layer, head, rank]
+    hard_concrete_temperature: 2.0
+    gate_sparsity_regulariser: 1e-5
+dataset:
+  name: sst2
+  source: "huggingface:stanfordnlp/sst2"
+  max_length: 128
+  padding: max_length
+  batch_size: 16
+training:
+  num_epochs: 3
+  learning_rate: 2e-5
+  optimizer: adamw
+  weight_decay: 0.01
+  gradient_accumulation_steps: 8
+  lr_scheduler: cosine
+  warmup_ratio: 0.05
+  seed: 42
+budgets:
+  energy_j: 6.0
+  latency_ms: 80.0
+  power_w: 11.0
+hardware_profiling:
+  target_device: Google-Pixel-8-EdgeTPU
+  real_measurements_required: 200
+  measurement_cache_dir: /data/echorda_pixel8_profiles
+objective_weights:
+  lambda_energy: 1.0
+  mu_latency: 0.0
+  nu_power: 0.0
+evaluation:
+  primary_metric: energy_j
+  metrics: [accuracy, energy_j, latency_ms, power_w]
+optuna:
+  n_trials: 60
+  direction: minimize
+  search_space:
+    learning_rate:
+      type: loguniform
+      low: 1e-5
+      high: 5e-4
+    lambda_energy:
+      type: loguniform
+      low: 0.1
+      high: 5.0
+    hard_concrete_temperature:
+      type: uniform
+      low: 0.5
+      high: 5.0
+    gate_sparsity_regulariser:
+      type: loguniform
+      low: 1e-6
+      high: 1e-3
+    batch_size:
+      type: categorical
+      choices: [8, 16, 32]
+
+  ```
+  
+
+
+# Generated Experiment Code (To be validated)
+{"config_yaml": "run: \"\"\nresults_dir: \"./results\"\nmode: full\n\nwandb:\n  entity: gengaru617-personal\n  project: 251106-test\n  mode: online\n\n# Placeholder groups \u2013 Populated by run-specific YAML at runtime\nmethod: null\nmodel: {}\ndataset: {}\ntraining: {}\noptuna: {}\nbudgets: {}\nsurrogate: {}\nobjective_weights: {}\n\nhydra:\n  run:\n    dir: .\n  output_subdir: null", "evaluate_py": "import argparse\nimport json\nimport os\nfrom pathlib import Path\nfrom typing import Dict, List\n\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport seaborn as sns\nimport wandb\n\n\ndef save_json(obj: Dict, path: Path):\n    path.parent.mkdir(parents=True, exist_ok=True)\n    with open(path, \"w\") as f:\n        json.dump(obj, f, indent=2)\n\n\ndef plot_learning_curve(history_df, run_id: str, out_dir: Path):\n    plt.figure()\n    if \"train_loss\" in history_df.columns:\n        sns.lineplot(data=history_df, x=history_df.index, y=\"train_loss\", label=\"train_loss\")\n    if \"val_loss\" in history_df.columns:\n        sns.lineplot(data=history_df, x=history_df.index, y=\"val_loss\", label=\"val_loss\")\n    if \"val_acc\" in history_df.columns:\n        sns.lineplot(data=history_df, x=history_df.index, y=\"val_acc\", label=\"val_acc\")\n    plt.xlabel(\"Step\")\n    plt.ylabel(\"Metric\")\n    plt.title(f\"Learning Curve - {run_id}\")\n    plt.legend()\n    plt.tight_layout()\n    fig_path = out_dir / f\"{run_id}_learning_curve.pdf\"\n    plt.savefig(fig_path)\n    plt.close()\n    print(fig_path)\n\n\ndef plot_confusion(confusion: List[List[int]], run_id: str, out_dir: Path):\n    cm = np.array(confusion)\n    plt.figure(figsize=(4, 4))\n    sns.heatmap(cm, annot=True, fmt=\"d\", cmap=\"Blues\")\n    plt.xlabel(\"Predicted\")\n    plt.ylabel(\"True\")\n    plt.title(f\"Confusion Matrix - {run_id}\")\n    plt.tight_layout()\n    fig_path = out_dir / f\"{run_id}_confusion_matrix.pdf\"\n    plt.savefig(fig_path)\n    plt.close()\n    print(fig_path)\n\n\ndef compute_hv(acc, energy, latency, power, budgets):\n    return max(0, acc) * max(0, budgets[\"energy_j\"] - energy) * max(0, budgets[\"latency_ms\"] - latency) * max(0, budgets[\"power_w\"] - power)\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"results_dir\", type=str)\n    parser.add_argument(\"run_ids\", type=str, help=\"JSON list of run IDs\")\n    args = parser.parse_args()\n\n    run_ids = json.loads(args.run_ids)\n    results_dir = Path(args.results_dir)\n\n    api = wandb.Api()\n\n    # Collect metrics across runs --------------------------------------\n    aggregated_metrics: Dict[str, Dict[str, float]] = {}\n    hv_scores: Dict[str, float] = {}\n\n    for rid in run_ids:\n        run = api.run(f\"{os.environ.get(\u0027WANDB_ENTITY\u0027, \u0027gengaru617-personal\u0027)}/{os.environ.get(\u0027WANDB_PROJECT\u0027, \u0027251106-test\u0027)}/{rid}\")\n        history = run.history()  # pandas DF\n        summary = run.summary._json_dict\n        config = dict(run.config)\n\n        # Export metrics ------------------------------------------------\n        run_out_dir = results_dir / rid\n        run_out_dir.mkdir(parents=True, exist_ok=True)\n\n        metrics_json = {\n            \"summary\": summary,\n            \"config\": config,\n            \"history_tail\": history.tail(5).to_dict(),\n        }\n        save_json(metrics_json, run_out_dir / \"metrics.json\")\n\n        # Learning curve\n        plot_learning_curve(history, rid, run_out_dir)\n\n        # Confusion matrix\n        if \"confusion_matrix\" in summary:\n            plot_confusion(summary[\"confusion_matrix\"], rid, run_out_dir)\n\n        # Collect primary metrics ------------------------------------\n        primary = summary.get(\"hv\", None)\n        if primary is not None:\n            hv_scores[rid] = primary\n        # Aggregate others\n        for k, v in summary.items():\n            if isinstance(v, (int, float)):\n                aggregated_metrics.setdefault(k, {})[rid] = v\n\n    # Aggregated analysis ----------------------------------------------\n    comparison_dir = results_dir / \"comparison\"\n    comparison_dir.mkdir(parents=True, exist_ok=True)\n\n    # Determine best proposed / baseline -------------------------------\n    best_proposed = {\"run_id\": None, \"value\": -1}\n    best_baseline = {\"run_id\": None, \"value\": -1}\n    for rid, val in hv_scores.items():\n        if \"proposed\" in rid:\n            if val \u003e best_proposed[\"value\"]:\n                best_proposed = {\"run_id\": rid, \"value\": val}\n        elif (\"comparative\" in rid) or (\"baseline\" in rid):\n            if val \u003e best_baseline[\"value\"]:\n                best_baseline = {\"run_id\": rid, \"value\": val}\n    gap = 0.0\n    if best_baseline[\"value\"] \u003e 0:\n        gap = (best_proposed[\"value\"] - best_baseline[\"value\"]) / best_baseline[\"value\"] * 100\n\n    aggregated_json = {\n        \"primary_metric\": \"4-D hyper-volume (HV) of accuracy vs (energy, latency, power) on the unseen Pixel-8.\",\n        \"metrics\": aggregated_metrics,\n        \"best_proposed\": best_proposed,\n        \"best_baseline\": best_baseline,\n        \"gap\": gap,\n    }\n    save_json(aggregated_json, comparison_dir / \"aggregated_metrics.json\")\n    print(comparison_dir / \"aggregated_metrics.json\")\n\n    # Simple bar chart for HV -----------------------------------------\n    plt.figure()\n    sns.barplot(x=list(hv_scores.keys()), y=list(hv_scores.values()))\n    plt.xticks(rotation=45, ha=\"right\")\n    plt.ylabel(\"Hyper-Volume\")\n    plt.title(\"HV comparison\")\n    plt.tight_layout()\n    fig_path = comparison_dir / \"comparison_hv_bar_chart.pdf\"\n    plt.savefig(fig_path)\n    plt.close()\n    print(fig_path)\n\n\nif __name__ == \"__main__\":\n    main()", "main_py": "import subprocess\nfrom pathlib import Path\n\nimport hydra\nfrom omegaconf import OmegaConf\n\n\n@hydra.main(config_path=\"../config\", config_name=\"config\")\ndef main(cfg):\n    # ---------- Basic argument check ----------\n    if cfg.mode not in (\"trial\", \"full\"):\n        raise ValueError(\"mode must be trial or full\")\n\n    # Build command ----------------------------------------------------\n    cmd = [\n        \"python\",\n        \"-u\",\n        \"-m\",\n        \"src.train\",\n        f\"run={cfg.run}\",\n        f\"results_dir={cfg.results_dir}\",\n        f\"mode={cfg.mode}\",\n    ]\n    # forward any additional overrides provided at CLI\n    subprocess.run(cmd, check=True)\n\n\nif __name__ == \"__main__\":\n    main()", "model_py": "import math\nfrom typing import Any, Dict\n\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nfrom transformers import AutoModelForSequenceClassification, AutoModel\nfrom peft import LoraConfig, get_peft_model\n\n# -------------------------------------------------------------\n# Hard-Concrete Gate\n# -------------------------------------------------------------\n\n\nclass HardConcreteGate(nn.Module):\n    def __init__(self, temperature: float = 2.0, init_mean: float = 0.5):\n        super().__init__()\n        self.temperature = temperature\n        logit = math.log(init_mean) - math.log(1 - init_mean)\n        self.log_alpha = nn.Parameter(torch.tensor(logit))\n        self.register_buffer(\"eps\", torch.tensor(1e-6))\n\n    def _sample_gate(self):\n        u = torch.rand_like(self.log_alpha)\n        s = torch.sigmoid((torch.log(u + self.eps) - torch.log(1 - u + self.eps) + self.log_alpha) / self.temperature)\n        return torch.clamp(s, 0, 1)\n\n    def forward(self, x):\n        if self.training:\n            gate = self._sample_gate()\n        else:\n            gate = torch.sigmoid(self.log_alpha)\n        return x * gate\n\n\n# -------------------------------------------------------------\n# Surrogate \u2013 shared for training \u0026 evaluation scripts\n# -------------------------------------------------------------\n\n\nclass MetaSurrogate(nn.Module):\n    def __init__(self, n_hw: int, d_stat: int = 5):\n        super().__init__()\n        self.hw_embed = nn.Embedding(n_hw, 8)\n        self.net = nn.Sequential(\n            nn.Linear(d_stat + 8, 64),\n            nn.ReLU(),\n            nn.Linear(64, 64),\n            nn.ReLU(),\n            nn.Linear(64, 3),\n        )\n\n    def forward(self, stats: torch.Tensor, hw_id: torch.Tensor):\n        h = self.hw_embed(hw_id)\n        x = torch.cat([stats, h], dim=-1)\n        return self.net(x).split(1, dim=-1)  # E, L, P\n\n\n# -------------------------------------------------------------\n# Build model (with LoRA + gating)\n# -------------------------------------------------------------\n\n\nclass ClassificationWrapper(nn.Module):\n    \"\"\"If the checkpoint is a causal LM, wrap it for classification.\"\"\"\n\n    def __init__(self, backbone: AutoModel, hidden_size: int, num_labels: int):\n        super().__init__()\n        self.backbone = backbone\n        self.classifier = nn.Linear(hidden_size, num_labels)\n\n    def forward(self, input_ids=None, attention_mask=None, labels=None):\n        out = self.backbone(input_ids=input_ids, attention_mask=attention_mask)\n        # For causal models: last hidden state is first element\n        hidden = out[0][:, -1]  # use last token\n        logits = self.classifier(hidden)\n        loss = None\n        if labels is not None:\n            loss = F.cross_entropy(logits, labels)\n        return {\"loss\": loss, \"logits\": logits}\n\n\ndef _inject_layer_gates(model, temperature):\n    # Very naive: insert a gate after each transformer block\u0027s output.\n    for name, module in model.named_modules():\n        if hasattr(module, \"output\") and isinstance(module.output, nn.Module):\n            module.output.register_forward_hook(lambda _mod, _inp, out, temp=temperature: HardConcreteGate(temp)(out))\n\n\ndef build_model(cfg, num_labels: int = 2):\n    try:\n        model = AutoModelForSequenceClassification.from_pretrained(\n            cfg.model.name, num_labels=num_labels, cache_dir=\".cache/\"\n        )\n    except Exception:\n        base = AutoModel.from_pretrained(cfg.model.name, cache_dir=\".cache/\")\n        hidden = base.config.hidden_size\n        model = ClassificationWrapper(base, hidden, num_labels)\n\n    # Extend embeddings if we added pad token\n    if hasattr(model, \"resize_token_embeddings\"):\n        model.resize_token_embeddings(len(model.config._tokenizer))\n\n    # LoRA (PEFT) ------------------------------------------------------\n    if hasattr(cfg.model, \"peft\") and cfg.model.peft is not None:\n        peft_cfg = LoraConfig(\n            r=cfg.model.peft.r,\n            lora_alpha=cfg.model.peft.alpha,\n            target_modules=cfg.model.peft.target_modules,\n            lora_dropout=cfg.model.peft.dropout,\n            bias=\"none\",\n            task_type=\"SEQ_CLS\",\n        )\n        model = get_peft_model(model, peft_cfg)\n\n    # Gating -----------------------------------------------------------\n    if hasattr(cfg.model, \"gating\") and cfg.model.gating is not None and \"layer\" in cfg.model.gating.granularity:\n        _inject_layer_gates(model, cfg.model.gating.hard_concrete_temperature)\n\n    return model\n\n\n# -------------------------------------------------------------\n# Metrics\n# -------------------------------------------------------------\n\ndef compute_hyper_volume(acc, e, l, p, budgets):\n    return max(0, acc) * max(0, budgets.energy_j - e) * max(0, budgets.latency_ms - l) * max(0, budgets.power_w - p)", "preprocess_py": "from typing import Tuple\n\nfrom datasets import load_dataset\nfrom torch.utils.data import DataLoader\nfrom transformers import AutoTokenizer\n\nimport torch\n\n# -------------------------------------------------------------\n# Tokeniser\n# -------------------------------------------------------------\n\ndef build_tokenizer(cfg):\n    tokenizer = AutoTokenizer.from_pretrained(cfg.model.name, cache_dir=\".cache/\")\n    # Llama models often miss pad token\n    if tokenizer.pad_token_id is None:\n        tokenizer.add_special_tokens({\"pad_token\": \"\u003cpad\u003e\"})\n    return tokenizer\n\n\n# -------------------------------------------------------------\n# Dataset + DataLoaders\n# -------------------------------------------------------------\n\ndef _tokenise_function(examples, tokenizer, cfg):\n    return tokenizer(\n        examples[\"sentence\"],\n        padding=cfg.dataset.padding,\n        truncation=True,\n        max_length=cfg.dataset.max_length,\n    )\n\n\ndef build_dataloaders(cfg, tokenizer) -\u003e Tuple[DataLoader, DataLoader]:\n    raw = load_dataset(cfg.dataset.source, cache_dir=\".cache/\")\n    # rename label column consistently\n    if \"label\" in raw[\"train\"].column_names:\n        raw = raw.rename_column(\"label\", \"labels\")\n    else:\n        raw = raw.rename_column(\"sentiment\", \"labels\")\n\n    tokenised = raw.map(lambda ex: _tokenise_function(ex, tokenizer, cfg), batched=True)\n    tokenised.set_format(\n        type=\"torch\",\n        columns=[\"input_ids\", \"attention_mask\", \"labels\"],\n    )\n\n    # Build loaders ----------------------------------------------------\n    train_ds = tokenised[\"train\"]\n    val_split = \"validation\" if \"validation\" in tokenised else \"test\"\n    val_ds = tokenised[val_split]\n\n    if cfg.mode == \"trial\":\n        train_ds = train_ds.shuffle(seed=42).select(range(min(2 * cfg.dataset.batch_size, len(train_ds))))\n        val_ds = val_ds.select(range(min(2 * cfg.dataset.batch_size, len(val_ds))))\n\n    train_loader = DataLoader(train_ds, batch_size=cfg.dataset.batch_size, shuffle=True)\n    val_loader = DataLoader(val_ds, batch_size=cfg.dataset.batch_size, shuffle=False)\n    return train_loader, val_loader", "pyproject_toml": "[build-system]\nrequires = [\"setuptools\", \"wheel\"]\n\n[project]\nname = \"metas-peft-experiments\"\nversion = \"0.1.0\"\ndescription = \"MetaSurrogate-PEFT experiments with Hydra\"\nrequires-python = \"\u003e=3.9\"\nauthors = [\n  { name=\"AI Research Automation\", email=\"noreply@example.com\"}\n]\n\n[project.dependencies]\nhydra-core = \"^1.3\"\nwandb = \"^0.15\"\noptuna = \"^3.5\"\ntorch = \"^2.1\"\ntransformers = \"^4.35\"\ndatasets = \"^2.14\"\npeft = \"^0.6\"\nscikit-learn = \"^1.3\"\nseaborn = \"^0.13\"\nmatplotlib = \"^3.8\"\npandas = \"^2.1\"\nomegaconf = \"^2.3\"", "train_py": "import os\nimport json\nimport math\nimport random\nimport time\nfrom pathlib import Path\nfrom typing import Any, Dict, Tuple\n\nimport hydra\nimport numpy as np\nimport optuna\nimport torch\nimport torch.nn.functional as F\nfrom omegaconf import OmegaConf\nfrom torch.utils.data import DataLoader\n\nimport wandb\n\nfrom .preprocess import build_tokenizer, build_dataloaders\nfrom .model import build_model, MetaSurrogate, compute_hyper_volume\n\n# -------------------------------------------------------------\n# Helper\n# -------------------------------------------------------------\n\ndef set_seed(seed: int):\n    random.seed(seed)\n    np.random.seed(seed)\n    torch.manual_seed(seed)\n    torch.cuda.manual_seed_all(seed)\n\n\ndef init_wandb(cfg):\n    if cfg.wandb.mode == \"disabled\":\n        os.environ[\"WANDB_MODE\"] = \"disabled\"\n        return None\n    run = wandb.init(\n        entity=cfg.wandb.entity,\n        project=cfg.wandb.project,\n        id=cfg.run_id,\n        config=OmegaConf.to_container(cfg, resolve=True),\n        resume=\"allow\",\n    )\n    print(f\"WandB URL: {run.get_url()}\")\n    return run\n\n\n# -------------------------------------------------------------\n# Optuna objective (returns best params) \u2013 we run optuna *outside* wandb\n# -------------------------------------------------------------\n\ndef _objective(trial, cfg, model, train_loader, val_loader, device, surrogate):\n    lr = trial.suggest_float(\"learning_rate\", 1e-5, 5e-4, log=True)\n    lambda_energy = trial.suggest_float(\"lambda_energy\", 0.1, 5.0, log=True)\n    mu_latency = trial.suggest_float(\"mu_latency\", 0.1, 5.0, log=True)\n    nu_power = trial.suggest_float(\"nu_power\", 0.1, 5.0, log=True)\n\n    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=cfg.training.weight_decay)\n\n    for epoch in range(1):  # a single epoch is enough for scoring configs\n        model.train()\n        for batch in train_loader:\n            optimizer.zero_grad()\n            batch = {k: v.to(device) for k, v in batch.items()}\n            out = model(**batch)\n            task_loss = out[\"loss\"]\n            # Surrogate prediction (dummy stats in trial):\n            stats = torch.stack(\n                [\n                    torch.full((1,), cfg.dataset.max_length).to(device),\n                    torch.tensor([0.5], device=device),\n                    torch.tensor([0.5], device=device),\n                    torch.tensor([0.5], device=device),\n                    torch.tensor([32], device=device),\n                ],\n                dim=-1,\n            )\n            hw_id = torch.tensor([cfg.surrogate.n_hardware_tags - 1]).to(device)\n            e_pred, l_pred, p_pred = surrogate(stats, hw_id).squeeze()\n            loss = task_loss + lambda_energy * e_pred + mu_latency * l_pred + nu_power * p_pred\n            loss.backward()\n            optimizer.step()\n        # quick val\n        model.eval()\n        correct, total = 0, 0\n        with torch.no_grad():\n            for batch in val_loader:\n                batch = {k: v.to(device) for k, v in batch.items()}\n                out = model(**batch)\n                pred = out[\"logits\"].argmax(-1)\n                correct += (pred == batch[\"labels\"]).sum().item()\n                total += pred.size(0)\n        acc = correct / total\n        trial.report(acc, epoch)\n    return acc\n\n\n# -------------------------------------------------------------\n# Train routine\n# -------------------------------------------------------------\n\n\ndef train_single_run(cfg):\n    device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n\n    # tokenizer + data\n    tokenizer = build_tokenizer(cfg)\n    train_loader, val_loader = build_dataloaders(cfg, tokenizer)\n\n    # model (backbone + optional LoRA/gating)\n    model = build_model(cfg, num_labels=2)\n    model.to(device)\n\n    # surrogate\n    surrogate = MetaSurrogate(cfg.surrogate.n_hardware_tags).to(device)\n    if Path(cfg.surrogate.checkpoint_path).exists():\n        surrogate.load_state_dict(torch.load(cfg.surrogate.checkpoint_path, map_location=device))\n    surrogate.eval()\n    for p in surrogate.parameters():\n        p.requires_grad = False\n\n    # Optuna Tuning -----------------------------------------------------\n    best_params = {}\n    if cfg.optuna.n_trials \u003e 0:\n        study = optuna.create_study(direction=cfg.optuna.direction)\n        study.optimize(\n            lambda trial: _objective(trial, cfg, model, train_loader, val_loader, device, surrogate),\n            n_trials=cfg.optuna.n_trials,\n        )\n        best_params = study.best_params\n        print(\"[Optuna] best params\", best_params)\n        # overwrite cfg with best params\n        OmegaConf.set_struct(cfg, False)\n        for k, v in best_params.items():\n            if k in cfg.training:\n                cfg.training[k] = v\n            elif k in cfg.objective_weights:\n                cfg.objective_weights[k] = v\n        OmegaConf.set_struct(cfg, True)\n\n    # Optimizer \u0026 scheduler --------------------------------------------\n    optimizer = torch.optim.AdamW(\n        model.parameters(),\n        lr=cfg.training.learning_rate,\n        weight_decay=cfg.training.weight_decay,\n    )\n    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader) * cfg.training.num_epochs)\n\n    # WandB -------------------------------------------------------------\n    run = init_wandb(cfg)\n\n    global_step = 0\n    for epoch in range(cfg.training.num_epochs):\n        model.train()\n        epoch_loss, epoch_task_loss = 0.0, 0.0\n        for step, batch in enumerate(train_loader):\n            batch = {k: v.to(device) for k, v in batch.items()}\n            optimizer.zero_grad()\n            out = model(**batch)\n            task_loss = out[\"loss\"]\n\n            # Dummy stats vector (we skip proper collection for brevity)\n            stats = torch.stack(\n                [\n                    torch.full((1,), cfg.dataset.max_length).to(device),\n                    torch.tensor([0.5], device=device),\n                    torch.tensor([0.5], device=device),\n                    torch.tensor([0.5], device=device),\n                    torch.tensor([32], device=device),\n                ],\n                dim=-1,\n            )\n            hw_id = torch.tensor([cfg.surrogate.n_hardware_tags - 1]).to(device)\n            with torch.no_grad():\n                e_pred, l_pred, p_pred = surrogate(stats, hw_id).squeeze()\n            loss = task_loss + cfg.objective_weights.lambda_energy * e_pred + cfg.objective_weights.mu_latency * l_pred + cfg.objective_weights.nu_power * p_pred\n            loss.backward()\n            optimizer.step()\n            scheduler.step()\n\n            epoch_loss += loss.item()\n            epoch_task_loss += task_loss.item()\n            if run is not None:\n                run.log(\n                    {\n                        \"train_loss\": loss.item(),\n                        \"task_loss\": task_loss.item(),\n                        \"pred_energy\": e_pred.item(),\n                        \"pred_latency\": l_pred.item(),\n                        \"pred_power\": p_pred.item(),\n                        \"lr\": scheduler.get_last_lr()[0],\n                    },\n                    step=global_step,\n                )\n            global_step += 1\n\n            # batch limiting in trial mode\n            if cfg.mode == \"trial\" and step \u003e= 1:\n                break\n\n        # Validation ---------------------------------------------------\n        model.eval()\n        correct, total, val_loss = 0, 0, 0.0\n        confusion = torch.zeros(2, 2, dtype=torch.int32)\n        with torch.no_grad():\n            for batch in val_loader:\n                batch = {k: v.to(device) for k, v in batch.items()}\n                out = model(**batch)\n                logits = out[\"logits\"]\n                loss = F.cross_entropy(logits, batch[\"labels\"])\n                val_loss += loss.item()\n                preds = logits.argmax(-1)\n                correct += (preds == batch[\"labels\"]).sum().item()\n                total += preds.size(0)\n                for t, p in zip(batch[\"labels\"].cpu(), preds.cpu()):\n                    confusion[t.long(), p.long()] += 1\n                if cfg.mode == \"trial\":\n                    break\n        val_acc = correct / max(1, total)\n        hv = compute_hyper_volume(\n            val_acc,\n            e_pred.item(),\n            l_pred.item(),\n            p_pred.item(),\n            cfg.budgets,\n        )\n        if run is not None:\n            run.log(\n                {\n                    \"epoch\": epoch,\n                    \"val_loss\": val_loss / max(1, total),\n                    \"val_acc\": val_acc,\n                    \"hyper_volume\": hv,\n                },\n                step=global_step,\n            )\n            # confusion matrix to summary for evaluation script\n            run.summary[\"confusion_matrix\"] = confusion.tolist()\n            run.summary[\"val_acc\"] = val_acc\n            run.summary[\"hv\"] = hv\n\n    if run is not None:\n        run.finish()\n\n\n# -------------------------------------------------------------\n# Hydra entry point\n# -------------------------------------------------------------\n\n\n@hydra.main(config_path=\"../config\", config_name=\"config\")\ndef main(cfg):\n    # Merge run-specific configuration\n    run_cfg_path = Path(__file__).resolve().parent.parent / \"config\" / \"runs\" / f\"{cfg.run}.yaml\"\n    if not run_cfg_path.exists():\n        raise FileNotFoundError(f\"Run config not found: {run_cfg_path}\")\n    run_cfg = OmegaConf.load(run_cfg_path)\n    cfg = OmegaConf.merge(cfg, run_cfg)\n\n    # Mode-specific overrides ----------------------------------------\n    if cfg.mode == \"trial\":\n        cfg.wandb.mode = \"disabled\"\n        cfg.optuna.n_trials = 0\n        cfg.training.num_epochs = 1\n        cfg.dataset.batch_size = min(cfg.dataset.batch_size, 2)\n    elif cfg.mode == \"full\":\n        cfg.wandb.mode = \"online\"\n    else:\n        raise ValueError(\"mode must be \u0027trial\u0027 or \u0027full\u0027\")\n\n    # Persist final config for reproducibility\n    out_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)\n    with open(out_dir / \"_resolved_config.yaml\", \"w\") as f:\n        OmegaConf.save(config=cfg, f=f)\n\n    set_seed(cfg.training.seed)\n    train_single_run(cfg)\n\n\nif __name__ == \"__main__\":\n    main()"}
+
+
+
+Analyze the experiment code thoroughly. Ensure it is complete, executable, and ready for publication-quality research experiments.
+Output:
+{
+    "is_code_ready": false,
+    "code_issue": "Code is not production-ready:\n1. Incomplete implementation markers – train.py contains explicit comment \"skip proper collection for brevity\" and uses a hard-coded dummy stats vector instead of the required real statistics; violates “no … for brevity / placeholder” rule.\n2. evaluate.py does NOT read entity/project from config/config.yaml as required; hard-codes environment variables instead.\n3. evaluate.py omits several mandatory STEP-2 outputs (no statistical significance tests, no cross-run tables/box-plots, only a simple bar chart) → requirement 8 not satisfied.\n4. WandB/Evaluate metric naming mismatch: training logs per-step key \"hyper_volume\" while summary key is \"hv\"; evaluation only looks at \"hv\" therefore learning-curve metric consistency is broken.\n5. Mode handling: main.py sets cfg.wandb.mode but train.py’s init_wandb consults cfg.wandb.mode BEFORE train.py applies the mode overrides; potential wrong WandB mode when invoked directly (training without main.py).\n6. Hard-Concrete gating is injected via a forward hook that instantiates a new HardConcreteGate on every call – parameters are NOT part of model graph; gating therefore does not learn.\n7. No real on-device or surrogate-based energy/latency/power statistics are gathered, Optuna objective and budget loss therefore use meaningless numbers – violates “complete model and data pipeline” requirement.\n8. build_dataloaders handles only datasets with a \"sentence\" column; will crash on CoLA or Natural-Instructions, so pipeline is not complete.\n\nBecause several core validation criteria (1, 2, 3, 4, 6) are violated, the experiment code is NOT ready for immediate execution."
+}
