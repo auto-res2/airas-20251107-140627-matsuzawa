@@ -1,0 +1,83 @@
+run_id: proposed-iter1-Llama-2-7B-SST-2
+method: MetaS-PEFT
+model:
+  name: Llama-2-7B
+  precision: bfloat16
+  architecture_notes: "Decoder-only 32-layer transformer; tri-granular gating (layer, head, LoRA rank)"
+  peft:
+    method: LoRA
+    target_modules: ["q_proj", "v_proj"]
+    r: 8          # default, tuned by Optuna
+    alpha: 16
+    dropout: 0.1
+  gating:
+    granularity: [layer, head, rank]
+    hard_concrete_temperature: 2.0
+    gate_sparsity_regulariser: 1e-5
+dataset:
+  name: sst2
+  source: "huggingface:stanfordnlp/sst2"
+  max_length: 128
+  padding: max_length
+  batch_size: 16
+training:
+  num_epochs: 3
+  learning_rate: 2e-5
+  optimizer: adamw
+  weight_decay: 0.01
+  gradient_accumulation_steps: 8
+  lr_scheduler: cosine
+  warmup_ratio: 0.05
+  seed: 42
+budgets:
+  energy_j: 6.0
+  latency_ms: 80.0
+  power_w: 11.0
+surrogate:
+  checkpoint_path: "checkpoints/meta_surrogate_v1.pt"
+  n_hardware_tags: 6
+  meta_training_devices: ["RTX-A6000", "Jetson-Orin-NX", "MacBook-M2", "iPhone-15-NPU", "Pixel-8-TPU", "Raspberry-Pi-4"]
+  calibration_samples: 5
+  calibration_method: linear_scale_shift
+objective_weights:
+  lambda_energy: 1.0
+  mu_latency: 1.0
+  nu_power: 1.0
+evaluation:
+  primary_metric: 4-D_hyper_volume
+  metrics: [accuracy, energy_j, latency_ms, power_w, surrogate_mae, hv]
+optuna:
+  n_trials: 60
+  direction: maximize
+  search_space:
+    learning_rate:
+      type: loguniform
+      low: 1e-5
+      high: 5e-4
+    lambda_energy:
+      type: loguniform
+      low: 0.1
+      high: 5.0
+    mu_latency:
+      type: loguniform
+      low: 0.1
+      high: 5.0
+    nu_power:
+      type: loguniform
+      low: 0.1
+      high: 5.0
+    hard_concrete_temperature:
+      type: uniform
+      low: 0.5
+      high: 5.0
+    gate_sparsity_regulariser:
+      type: loguniform
+      low: 1e-6
+      high: 1e-3
+    r:
+      type: int
+      low: 4
+      high: 32
+    batch_size:
+      type: categorical
+      choices: [8, 16, 32]
