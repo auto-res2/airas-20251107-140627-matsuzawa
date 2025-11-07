@@ -6,5 +6,82 @@
     "adapter-based tuning",
     "layer-wise lr decay",
     "hyperparameter optimization"
+  ],
+  "research_study_list": [
+    {
+      "title": "Spectral Adapter: Fine-Tuning in Spectral Space"
+    },
+    {
+      "title": "Parameter-Efficient Fine-Tuning Design Spaces"
+    },
+    {
+      "title": "ReFT: Representation Finetuning for Language Models"
+    },
+    {
+      "title": "SVFT: Parameter-Efficient Fine-Tuning with Singular Vectors"
+    },
+    {
+      "title": "Make Pre-trained Model Reversible: From Parameter to Memory Efficient Fine-Tuning"
+    },
+    {
+      "title": "The Expressive Power of Low-Rank Adaptation"
+    },
+    {
+      "title": "Spectral Entry-wise Matrix Estimation for Low-Rank Reinforcement Learning"
+    },
+    {
+      "title": "Low-rank Optimal Transport: Approximation, Statistics and Debiasing"
+    },
+    {
+      "title": "Low-rank lottery tickets: finding efficient low-rank neural networks via matrix differential equations"
+    },
+    {
+      "title": "Compressible Dynamics in Deep Overparameterized Low-Rank Learning & Adaptation"
+    },
+    {
+      "title": "Spectral Adapter: Fine-Tuning in Spectral Space"
+    },
+    {
+      "title": "Adapters Strike Back"
+    },
+    {
+      "title": "Res-Tuning: A Flexible and Efficient Tuning Paradigm via Unbinding Tuner from Backbone"
+    },
+    {
+      "title": "Conditionally Adaptive Multi-Task Learning: Improving Transfer Learning in NLP Using Fewer Parameters & Less Data"
+    },
+    {
+      "title": "Towards Modular LLMs by Building and Reusing a Library of LoRAs"
+    },
+    {
+      "title": "On the Weight Dynamics of Deep Normalized Networks"
+    },
+    {
+      "title": "Temperature Balancing, Layer-wise Weight Analysis, and Neural Network Training"
+    },
+    {
+      "title": "AutoLRS: Automatic Learning-Rate Schedule by Bayesian Optimization on the Fly"
+    },
+    {
+      "title": "Rotational Equilibrium: How Weight Decay Balances Learning Across Neural Networks"
+    },
+    {
+      "title": "Which Layer is Learning Faster? A Systematic Exploration of Layer-wise Convergence Rate for Deep Neural Networks"
+    },
+    {
+      "title": "DP-HyPO: An Adaptive Private Framework for Hyperparameter Optimization"
+    },
+    {
+      "title": "Hyperparameter Optimization through Neural Network Partitioning"
+    },
+    {
+      "title": "Learning to Mutate with Hypergradient Guided Population"
+    },
+    {
+      "title": "Implicit differentiation of Lasso-type models for hyperparameter optimization"
+    },
+    {
+      "title": "Bayesian Optimization for Iterative Learning"
+    }
   ]
 }
