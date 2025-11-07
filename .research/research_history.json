@@ -747,6 +747,193 @@
             "nu_power (ν)": "0.1-5.0",
             "hard_concrete_temperature": "0.5-5.0",
             "gate_sparsity_regulariser": "1e-6-1e-3"
+          },
+          "external_resources": {
+            "hugging_face": {
+              "models": [
+                {
+                  "id": "pucpr-br/Clinical-BR-LlaMA-2-7B",
+                  "author": "pucpr-br",
+                  "sha": "cc3f2623dd6984751de1caed0717ddca1a833a6e",
+                  "created_at": "2024-02-03T00:24:33+00:00",
+                  "last_modified": "2024-08-29T14:35:05+00:00",
+                  "private": false,
+                  "gated": false,
+                  "disabled": false,
+                  "downloads": 104782,
+                  "likes": 9,
+                  "siblings": [
+                    {
+                      "rfilename": ".gitattributes"
+                    },
+                    {
+                      "rfilename": "README.md"
+                    },
+                    {
+                      "rfilename": "config.json"
+                    },
+                    {
+                      "rfilename": "generation_config.json"
+                    },
+                    {
+                      "rfilename": "model.safetensors"
+                    },
+                    {
+                      "rfilename": "special_tokens_map.json"
+                    },
+                    {
+                      "rfilename": "tokenizer.json"
+                    },
+                    {
+                      "rfilename": "tokenizer.model"
+                    },
+                    {
+                      "rfilename": "tokenizer_config.json"
+                    }
+                  ],
+                  "card_data": {
+                    "license": "apache-2.0",
+                    "language": [
+                      "pt"
+                    ],
+                    "pipeline_tag": "text-generation",
+                    "tags": [],
+                    "datasets": [],
+                    "base_model": "meta-llama/Llama-2-7b",
+                    "task_categories": [],
+                    "size_categories": [],
+                    "metrics": [],
+                    "widget": []
+                  },
+                  "tags": [
+                    "transformers",
+                    "safetensors",
+                    "llama",
+                    "text-generation",
+                    "pt",
+                    "base_model:meta-llama/Llama-2-7b",
+                    "base_model:finetune:meta-llama/Llama-2-7b",
+                    "license:apache-2.0",
+                    "autotrain_compatible",
+                    "text-generation-inference",
+                    "endpoints_compatible",
+                    "region:us"
+                  ],
+                  "pipeline_tag": "text-generation",
+                  "library_name": "transformers",
+                  "readme": "---\nlicense: apache-2.0\nlanguage:\n- pt\nbase_model: meta-llama/Llama-2-7b\npipeline_tag: text-generation\n---\n\n# MED-LLM-BR: Medical Large Language Models for Brazilian Portuguese\nMED-LLM-BR is a collaborative project between [HAILab](https://github.com/HAILab-PUCPR) and [Comsentimento](https://www.comsentimento.com.br/), which aims to develop multiple medical LLMs for Portuguese language, including base models and task-specific models, with different sizes. \n\n## Introduction\nClinical-BR-LlaMA-2-7B is a fine-tuned language model specifically designed for generating clinical notes in Portuguese. This model builds on the strengths of LlaMA 2 7B, adapting it through targeted fine-tuning techniques to meet the unique demands of clinical text generation. By focusing on the nuances and complexities of medical language in Portuguese, Clinical-BR-LlaMA-2-7B aims to support healthcare professionals with contextually accurate and relevant clinical documentation.\n\n## Fine-Tuning Approach\nTo enhance memory efficiency and reduce computational demands, we implemented LoRA with 16-bit precision on the q_proj and v_proj projections. We configured LoRA with R set to 8, Alpha to 16, and Dropout to 0.1, allowing the model to adapt effectively while preserving output quality. For optimization, the AdamW optimizer was used with parameters β1 = 0.9 and β2 = 0.999, achieving a balance between fast convergence and training stability. This careful tuning process ensures robust performance in generating accurate and contextually appropriate clinical text in Portuguese.\n\n## Data\nThe fine-tuning of Clinical-BR-LlaMA-2-7B utilized 2.4GB of text from three clinical datasets. The SemClinBr project provided diverse clinical narratives from Brazilian hospitals, while the BRATECA dataset contributed admission notes from various departments in 10 hospitals. Additionally, data from Lopes et al., 2019, added neurology-focused texts from European Portuguese medical journals. These datasets collectively improved the model’s ability to generate accurate clinical notes in Portuguese.\n\n## Provisional Citation:\n```\n@inproceedings{pinto2024clinicalLLMs,\n  title        = {Developing Resource-Efficient Clinical LLMs for Brazilian Portuguese},\n  author       = {João Gabriel de Souza Pinto and Andrey Rodrigues de Freitas and Anderson Carlos Gomes Martins and Caroline Midori Rozza Sawazaki and Caroline Vidal and Lucas Emanuel Silva e Oliveira},\n  booktitle    = {Proceedings of the 34th Brazilian Conference on Intelligent Systems (BRACIS)},\n  year         = {2024},\n  note         = {In press},\n}\n```",
+                  "extracted_code": ""
+                }
+              ],
+              "datasets": [
+                {
+                  "id": "stanfordnlp/sst2",
+                  "author": "stanfordnlp",
+                  "sha": "8d51e7e4887a4caaa95b3fbebbf53c0490b58bbb",
+                  "created_at": "2022-06-13T14:01:47+00:00",
+                  "last_modified": "2024-01-04T16:31:07+00:00",
+                  "private": false,
+                  "gated": false,
+                  "disabled": false,
+                  "downloads": 11057,
+                  "likes": 133,
+                  "siblings": [
+                    {
+                      "rfilename": ".gitattributes"
+                    },
+                    {
+                      "rfilename": "README.md"
+                    },
+                    {
+                      "rfilename": "data/test-00000-of-00001.parquet"
+                    },
+                    {
+                      "rfilename": "data/train-00000-of-00001.parquet"
+                    },
+                    {
+                      "rfilename": "data/validation-00000-of-00001.parquet"
+                    }
+                  ],
+                  "card_data": {
+                    "license": [
+                      "unknown"
+                    ],
+                    "language": [
+                      "en"
+                    ],
+                    "tags": [],
+                    "datasets": [],
+                    "task_categories": [
+                      "text-classification"
+                    ],
+                    "size_categories": [
+                      "10K<n<100K"
+                    ],
+                    "metrics": [],
+                    "widget": []
+                  },
+                  "tags": [
+                    "task_categories:text-classification",
+                    "task_ids:sentiment-classification",
+                    "annotations_creators:crowdsourced",
+                    "language_creators:found",
+                    "multilinguality:monolingual",
+                    "source_datasets:original",
+                    "language:en",
+                    "license:unknown",
+                    "size_categories:10K<n<100K",
+                    "format:parquet",
+                    "modality:text",
+                    "library:datasets",
+                    "library:pandas",
+                    "library:mlcroissant",
+                    "library:polars",
+                    "region:us"
+                  ],
+                  "readme": "---\nannotations_creators:\n- crowdsourced\nlanguage_creators:\n- found\nlanguage:\n- en\nlicense:\n- unknown\nmultilinguality:\n- monolingual\nsize_categories:\n- 10K<n<100K\nsource_datasets:\n- original\ntask_categories:\n- text-classification\ntask_ids:\n- sentiment-classification\npaperswithcode_id: sst\npretty_name: Stanford Sentiment Treebank v2\ndataset_info:\n  features:\n  - name: idx\n    dtype: int32\n  - name: sentence\n    dtype: string\n  - name: label\n    dtype:\n      class_label:\n        names:\n          '0': negative\n          '1': positive\n  splits:\n  - name: train\n    num_bytes: 4681603\n    num_examples: 67349\n  - name: validation\n    num_bytes: 106252\n    num_examples: 872\n  - name: test\n    num_bytes: 216640\n    num_examples: 1821\n  download_size: 3331058\n  dataset_size: 5004495\nconfigs:\n- config_name: default\n  data_files:\n  - split: train\n    path: data/train-*\n  - split: validation\n    path: data/validation-*\n  - split: test\n    path: data/test-*\n---\n\n# Dataset Card for [Dataset Name]\n\n## Table of Contents\n- [Table of Contents](#table-of-contents)\n- [Dataset Description](#dataset-description)\n  - [Dataset Summary](#dataset-summary)\n  - [Supported Tasks and Leaderboards](#supported-tasks-and-leaderboards)\n  - [Languages](#languages)\n- [Dataset Structure](#dataset-structure)\n  - [Data Instances](#data-instances)\n  - [Data Fields](#data-fields)\n  - [Data Splits](#data-splits)\n- [Dataset Creation](#dataset-creation)\n  - [Curation Rationale](#curation-rationale)\n  - [Source Data](#source-data)\n  - [Annotations](#annotations)\n  - [Personal and Sensitive Information](#personal-and-sensitive-information)\n- [Considerations for Using the Data](#considerations-for-using-the-data)\n  - [Social Impact of Dataset](#social-impact-of-dataset)\n  - [Discussion of Biases](#discussion-of-biases)\n  - [Other Known Limitations](#other-known-limitations)\n- [Additional Information](#additional-information)\n  - [Dataset Curators](#dataset-curators)\n  - [Licensing Information](#licensing-information)\n  - [Citation Information](#citation-information)\n  - [Contributions](#contributions)\n\n## Dataset Description\n\n- **Homepage:** https://nlp.stanford.edu/sentiment/\n- **Repository:**\n- **Paper:** [Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank](https://www.aclweb.org/anthology/D13-1170/)\n- **Leaderboard:**\n- **Point of Contact:**\n\n### Dataset Summary\n\nThe Stanford Sentiment Treebank is a corpus with fully labeled parse trees that allows for a complete analysis of the\ncompositional effects of sentiment in language. The corpus is based on the dataset introduced by Pang and Lee (2005)\nand consists of 11,855 single sentences extracted from movie reviews. It was parsed with the Stanford parser and\nincludes a total of 215,154 unique phrases from those parse trees, each annotated by 3 human judges.\n\nBinary classification experiments on full sentences (negative or somewhat negative vs somewhat positive or positive\nwith neutral sentences discarded) refer to the dataset as SST-2 or SST binary.\n\n### Supported Tasks and Leaderboards\n\n- `sentiment-classification`\n\n### Languages\n\nThe text in the dataset is in English (`en`).\n\n## Dataset Structure\n\n### Data Instances\n\n```\n{'idx': 0,\n 'sentence': 'hide new secretions from the parental units ',\n 'label': 0}\n```\n\n### Data Fields\n\n- `idx`: Monotonically increasing index ID.\n- `sentence`: Complete sentence expressing an opinion about a film.\n- `label`: Sentiment of the opinion, either \"negative\" (0) or positive (1). The test set labels are hidden (-1).\n\n### Data Splits\n\n|                    |    train | validation | test |\n|--------------------|---------:|-----------:|-----:|\n| Number of examples |    67349 |        872 | 1821 |\n\n## Dataset Creation\n\n### Curation Rationale\n\n[More Information Needed]\n\n### Source Data\n\n#### Initial Data Collection and Normalization\n\n[More Information Needed]\n\n#### Who are the source language producers?\n\nRotten Tomatoes reviewers.\n\n### Annotations\n\n#### Annotation process\n\n[More Information Needed]\n\n#### Who are the annotators?\n\n[More Information Needed]\n\n### Personal and Sensitive Information\n\n[More Information Needed]\n\n## Considerations for Using the Data\n\n### Social Impact of Dataset\n\n[More Information Needed]\n\n### Discussion of Biases\n\n[More Information Needed]\n\n### Other Known Limitations\n\n[More Information Needed]\n\n## Additional Information\n\n### Dataset Curators\n\n[More Information Needed]\n\n### Licensing Information\n\nUnknown.\n\n### Citation Information\n\n```bibtex\n@inproceedings{socher-etal-2013-recursive,\n    title = \"Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank\",\n    author = \"Socher, Richard  and\n      Perelygin, Alex  and\n      Wu, Jean  and\n      Chuang, Jason  and\n      Manning, Christopher D.  and\n      Ng, Andrew  and\n      Potts, Christopher\",\n    booktitle = \"Proceedings of the 2013 Conference on Empirical Methods in Natural Language Processing\",\n    month = oct,\n    year = \"2013\",\n    address = \"Seattle, Washington, USA\",\n    publisher = \"Association for Computational Linguistics\",\n    url = \"https://www.aclweb.org/anthology/D13-1170\",\n    pages = \"1631--1642\",\n}\n```\n\n### Contributions\n\nThanks to [@albertvillanova](https://github.com/albertvillanova) for adding this dataset."
+                },
+                {
+                  "id": "SetFit/sst2",
+                  "author": "SetFit",
+                  "sha": "00ea8ccb7a54b4e3780a3e51aa3f80361ff849c0",
+                  "created_at": "2022-03-02T23:29:22+00:00",
+                  "last_modified": "2021-12-25T06:16:15+00:00",
+                  "private": false,
+                  "gated": false,
+                  "disabled": false,
+                  "downloads": 5417,
+                  "likes": 11,
+                  "siblings": [
+                    {
+                      "rfilename": ".gitattributes"
+                    },
+                    {
+                      "rfilename": "README.md"
+                    },
+                    {
+                      "rfilename": "dev.jsonl"
+                    },
+                    {
+                      "rfilename": "test.jsonl"
+                    },
+                    {
+                      "rfilename": "train.jsonl"
+                    }
+                  ],
+                  "tags": [
+                    "size_categories:1K<n<10K",
+                    "format:json",
+                    "modality:text",
+                    "library:datasets",
+                    "library:pandas",
+                    "library:mlcroissant",
+                    "library:polars",
+                    "region:us"
+                  ],
+                  "readme": "# Stanford Sentiment Treebank - Binary\r\n\r\n[Stanford Sentiment Treebank](http://nlp.stanford.edu/sentiment/) with 2 labels: negative, positive\r\n\r\nSplits are from: \r\n[https://github.com/AcademiaSinicaNLPLab/sentiment_dataset/tree/master/data](https://github.com/AcademiaSinicaNLPLab/sentiment_dataset/tree/master/data)\r\n\r\nTraining data is on sentence level, not on phrase level!\r\n"
+                }
+              ]
+            }
           }
         },
         "experiment_runs": [
